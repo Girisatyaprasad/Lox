@@ -1,0 +1,22 @@
+name: freeform_lockstudio
+description: Offline-first freeform lock screen design studio.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  file_picker: 8.1.7
+  path_provider: 2.1.5
+  intl: 0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: 5.0.0
+
+flutter:
+  uses-material-design: true
