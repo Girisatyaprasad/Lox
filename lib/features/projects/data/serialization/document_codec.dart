@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import '../../../core/domain/layer_transform.dart';
-import '../../../core/domain/studio_document.dart';
-import '../../../core/domain/studio_layer.dart';
+import '../../../../core/domain/layer_transform.dart';
+import '../../../../core/domain/studio_document.dart';
+import '../../../../core/domain/studio_layer.dart';
 
 /// Persistence adapter for the existing version 1 project JSON format.
 ///

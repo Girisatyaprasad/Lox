@@ -61,25 +61,25 @@ class _EditorScreenState extends State<EditorScreen> {
     super.initState();
     final initialLayers = <StudioLayer>[
       StudioLayer(
-        id: 'clock',
-        name: 'Clock',
-        kind: LayerKind.clock,
-        x: .5,
-        y: .39,
-        width: .74,
-        height: .39,
-        fontSize: 290,
-        color: 0xfff7f2ee),
+          id: 'clock',
+          name: 'Clock',
+          kind: LayerKind.clock,
+          x: .5,
+          y: .39,
+          width: .74,
+          height: .39,
+          fontSize: 290,
+          color: 0xfff7f2ee),
       StudioLayer(
-        id: 'date',
-        name: 'Date',
-        kind: LayerKind.date,
-        x: .5,
-        y: .59,
-        width: .72,
-        height: .06,
-        fontSize: 66,
-        color: 0xffffdf47),
+          id: 'date',
+          name: 'Date',
+          kind: LayerKind.date,
+          x: .5,
+          y: .59,
+          width: .72,
+          height: .06,
+          fontSize: 66,
+          color: 0xffffdf47),
     ];
     doc = doc.copyWith(layers: initialLayers);
     selectedId = 'clock';
@@ -282,8 +282,8 @@ class _EditorScreenState extends State<EditorScreen> {
     await loader.load();
     _loadedFonts.add(family);
     if (selected != null) {
-      _mutate(() => _updateLayer(selected!.id,
-          (layer) => layer.copyWith(fontFamily: family)));
+      _mutate(() => _updateLayer(
+          selected!.id, (layer) => layer.copyWith(fontFamily: family)));
     }
   }
 
@@ -803,11 +803,11 @@ class _EditorScreenState extends State<EditorScreen> {
                                                         .visibility_off_outlined,
                                                 size: 19),
                                             onPressed: () {
-                                              _mutate(
-                                                  () => _updateLayer(l.id,
-                                                      (layer) => layer.copyWith(
-                                                          visible:
-                                                              !layer.visible)));
+                                              _mutate(() => _updateLayer(
+                                                  l.id,
+                                                  (layer) => layer.copyWith(
+                                                      visible:
+                                                          !layer.visible)));
                                               refresh(() {});
                                             }),
                                         IconButton(
@@ -817,11 +817,10 @@ class _EditorScreenState extends State<EditorScreen> {
                                                     : Icons.lock_open_outlined,
                                                 size: 19),
                                             onPressed: () {
-                                              _mutate(
-                                                  () => _updateLayer(l.id,
-                                                      (layer) => layer.copyWith(
-                                                          locked:
-                                                              !layer.locked)));
+                                              _mutate(() => _updateLayer(
+                                                  l.id,
+                                                  (layer) => layer.copyWith(
+                                                      locked: !layer.locked)));
                                               refresh(() {});
                                             }),
                                         IconButton(
@@ -836,7 +835,8 @@ class _EditorScreenState extends State<EditorScreen> {
                                                         id: DateTime.now()
                                                             .microsecondsSinceEpoch
                                                             .toString(),
-                                                        name: '${l.name} copy'));
+                                                        name:
+                                                            '${l.name} copy'));
                                                 doc = doc.copyWith(
                                                     layers: layers);
                                               });
@@ -885,35 +885,34 @@ class _EditorScreenState extends State<EditorScreen> {
                         color: Colors.white60))),
             if (layer.kind == LayerKind.clock)
               TextButton(
-                  onPressed: () =>
-                      _mutate(() => _updateLayer(
-                          layer.id,
-                          (current) => current.copyWith(
-                              use24Hour: !current.use24Hour))),
+                  onPressed: () => _mutate(() => _updateLayer(
+                      layer.id,
+                      (current) =>
+                          current.copyWith(use24Hour: !current.use24Hour))),
                   child: Text(layer.use24Hour ? '24 H' : '12 H')),
             if (layer.kind == LayerKind.clock)
               IconButton(
-                  onPressed: () =>
-                      _mutate(() => _updateLayer(
-                          layer.id,
-                          (current) => current.copyWith(
-                              showSeconds: !current.showSeconds))),
+                  onPressed: () => _mutate(() => _updateLayer(
+                      layer.id,
+                      (current) =>
+                          current.copyWith(showSeconds: !current.showSeconds))),
                   icon: Icon(Icons.more_time,
                       color: layer.showSeconds ? _accent : Colors.white54)),
             if (layer.kind == LayerKind.clock)
               TextButton(
-                  onPressed: () =>
-                      _mutate(() => _updateLayer(
-                          layer.id,
-                          (current) => current.copyWith(
-                              verticalClock: !current.verticalClock))),
+                  onPressed: () => _mutate(() => _updateLayer(
+                      layer.id,
+                      (current) => current.copyWith(
+                          verticalClock: !current.verticalClock))),
                   child: Text(layer.verticalClock ? 'VERT' : 'HORIZ')),
             IconButton(
                 onPressed: () => _mutate(() {
                       doc = doc.copyWith(layers: [
                         ...doc.layers,
                         layer.copyWith(
-                            id: DateTime.now().microsecondsSinceEpoch.toString(),
+                            id: DateTime.now()
+                                .microsecondsSinceEpoch
+                                .toString(),
                             name: '${layer.name} copy'),
                       ]);
                     }),
@@ -939,8 +938,7 @@ class _EditorScreenState extends State<EditorScreen> {
                       value: layer.fontSize.clamp(20, 480),
                       min: 20,
                       max: 480,
-                      onChanged: (v) => setState(() => _updateLayer(
-                          layer.id,
+                      onChanged: (v) => setState(() => _updateLayer(layer.id,
                           (current) => current.copyWith(fontSize: v))),
                       onChangeStart: (_) => _checkpoint())),
               Text(layer.fontSize.round().toString(),
@@ -975,8 +973,7 @@ class _EditorScreenState extends State<EditorScreen> {
                       value: layer.letterSpacing.clamp(-20, 80),
                       min: -20,
                       max: 80,
-                      onChanged: (v) => setState(() => _updateLayer(
-                          layer.id,
+                      onChanged: (v) => setState(() => _updateLayer(layer.id,
                           (current) => current.copyWith(letterSpacing: v))),
                       onChangeStart: (_) => _checkpoint()))
             ]),
@@ -991,8 +988,7 @@ class _EditorScreenState extends State<EditorScreen> {
                       min: .05,
                       max: 1,
                       onChanged: (v) => setState(() => _updateLayer(
-                          layer.id,
-                          (current) => current.copyWith(opacity: v))),
+                          layer.id, (current) => current.copyWith(opacity: v))),
                       onChangeStart: (_) => _checkpoint())),
               Text('${(layer.opacity * 100).round()}%',
                   style: const TextStyle(fontSize: 11))
@@ -1063,8 +1059,7 @@ class _EditorScreenState extends State<EditorScreen> {
                       value: layer.rotation.clamp(-3.14, 3.14),
                       min: -3.14,
                       max: 3.14,
-                      onChanged: (v) => setState(() => _updateLayer(
-                          layer.id,
+                      onChanged: (v) => setState(() => _updateLayer(layer.id,
                           (current) => current.copyWith(rotation: v))),
                       onChangeStart: (_) => _checkpoint()))
             ]),
@@ -1114,7 +1109,8 @@ class _EditorScreenState extends State<EditorScreen> {
                       child: const Text('Done'))
                 ]));
     if (v != null) {
-      _mutate(() => _updateLayer(layer.id, (current) => current.copyWith(text: v)));
+      _mutate(
+          () => _updateLayer(layer.id, (current) => current.copyWith(text: v)));
     }
   }
 
@@ -1174,8 +1170,8 @@ class _EditorScreenState extends State<EditorScreen> {
       final n = int.parse(v.replaceAll('#', ''), radix: 16);
       final selectedId = this.selected?.id;
       if (selectedId != null) {
-        _mutate(() => _updateLayer(selectedId,
-            (layer) => layer.copyWith(color: 0xff000000 | n)));
+        _mutate(() => _updateLayer(
+            selectedId, (layer) => layer.copyWith(color: 0xff000000 | n)));
       }
     } catch (_) {
       _notice('Enter a six digit hex color');

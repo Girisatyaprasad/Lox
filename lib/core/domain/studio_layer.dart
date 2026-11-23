@@ -45,6 +45,7 @@ class StudioLayer {
   final String name;
   final LayerKind kind;
   final String text;
+
   /// Kept as an opaque string at the domain boundary for legacy project paths.
   final String? imagePath;
   final LayerTransform transform;

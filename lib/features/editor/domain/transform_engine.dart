@@ -1,4 +1,4 @@
-import '../../core/domain/studio_layer.dart';
+import '../../../core/domain/studio_layer.dart';
 
 /// Pure transformation operations for normalized document layers.
 class TransformEngine {

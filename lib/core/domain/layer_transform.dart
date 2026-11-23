@@ -53,5 +53,6 @@ class LayerTransform {
           scaleY == other.scaleY;
 
   @override
-  int get hashCode => Object.hash(x, y, width, height, rotation, scaleX, scaleY);
+  int get hashCode =>
+      Object.hash(x, y, width, height, rotation, scaleX, scaleY);
 }

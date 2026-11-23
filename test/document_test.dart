@@ -49,15 +49,17 @@ void main() {
     expect(document.height, 2400);
     expect(layer.kind, LayerKind.clock);
     expect(layer.imagePath, '/app/documents/assets/wallpaper.png');
-    expect(layer.transform, const LayerTransform(
-      x: .37,
-      y: .41,
-      width: .24,
-      height: .7,
-      rotation: .2,
-      scaleX: .8,
-      scaleY: 1.4,
-    ));
+    expect(
+        layer.transform,
+        const LayerTransform(
+          x: .37,
+          y: .41,
+          width: .24,
+          height: .7,
+          rotation: .2,
+          scaleX: .8,
+          scaleY: 1.4,
+        ));
     expect(layer.opacity, .73);
     expect(layer.color, 4289379276);
     expect(layer.fontFamily, 'ImportedFont');
@@ -193,11 +195,13 @@ void main() {
     expect(TransformEngine.resize(layer, 100, 100, 400, 1000), same(layer));
     expect(TransformEngine.scale(layer, 2, 2), same(layer));
     expect(TransformEngine.rotate(layer, 1), same(layer));
-    expect(layer.transform, const LayerTransform(
-      x: .5,
-      y: .5,
-      width: .2,
-      height: .3,
-    ));
+    expect(
+        layer.transform,
+        const LayerTransform(
+          x: .5,
+          y: .5,
+          width: .2,
+          height: .3,
+        ));
   });
 }
