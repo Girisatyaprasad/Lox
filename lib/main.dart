@@ -9,8 +9,10 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'document.dart';
-import 'transform.dart';
+import 'core/domain/studio_document.dart';
+import 'core/domain/studio_layer.dart';
+import 'features/editor/domain/transform_engine.dart';
+import 'features/projects/data/serialization/document_codec.dart';
 
 const _ink = Color(0xff101113);
 const _panel = Color(0xff1c1d20);
@@ -57,7 +59,8 @@ class _EditorScreenState extends State<EditorScreen> {
   @override
   void initState() {
     super.initState();
-    doc.layers.add(StudioLayer(
+    final initialLayers = <StudioLayer>[
+      StudioLayer(
         id: 'clock',
         name: 'Clock',
         kind: LayerKind.clock,
@@ -66,8 +69,8 @@ class _EditorScreenState extends State<EditorScreen> {
         width: .74,
         height: .39,
         fontSize: 290,
-        color: 0xfff7f2ee));
-    doc.layers.add(StudioLayer(
+        color: 0xfff7f2ee),
+      StudioLayer(
         id: 'date',
         name: 'Date',
         kind: LayerKind.date,
@@ -76,7 +79,9 @@ class _EditorScreenState extends State<EditorScreen> {
         width: .72,
         height: .06,
         fontSize: 66,
-        color: 0xffffdf47));
+        color: 0xffffdf47),
+    ];
+    doc = doc.copyWith(layers: initialLayers);
     selectedId = 'clock';
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       final activeClock = doc.layers
@@ -123,6 +128,20 @@ class _EditorScreenState extends State<EditorScreen> {
     setState(action);
   }
 
+  void _replaceLayer(StudioLayer updated) {
+    final index = doc.layers.indexWhere((layer) => layer.id == updated.id);
+    if (index < 0) return;
+    final layers = [...doc.layers];
+    layers[index] = updated;
+    doc = doc.copyWith(layers: layers);
+  }
+
+  void _updateLayer(String id, StudioLayer Function(StudioLayer) update) {
+    final index = doc.layers.indexWhere((layer) => layer.id == id);
+    if (index < 0) return;
+    _replaceLayer(update(doc.layers[index]));
+  }
+
   Future<Directory> _projectDir() async {
     final root = await getApplicationDocumentsDirectory();
     final dir = Directory('${root.path}/projects');
@@ -146,7 +165,7 @@ class _EditorScreenState extends State<EditorScreen> {
                       child: const Text('Save'))
                 ]));
     if (title != null && title.trim().isNotEmpty) {
-      _mutate(() => doc.title = title.trim());
+      _mutate(() => doc = doc.copyWith(title: title.trim()));
     }
   }
 
@@ -154,7 +173,7 @@ class _EditorScreenState extends State<EditorScreen> {
     final dir = await _projectDir();
     final safe = doc.title.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
     final file = File('${dir.path}/$safe.json');
-    await file.writeAsString(doc.encode());
+    await file.writeAsString(DocumentCodec.encode(doc));
     if (mounted) _notice('Project saved on this device');
   }
 
@@ -191,7 +210,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                         trailing:
                                             const Icon(Icons.chevron_right),
                                         onTap: () async {
-                                          final opened = StudioDocument.decode(
+                                          final opened = DocumentCodec.decode(
                                               await f.readAsString());
                                           if (!mounted) return;
                                           await _loadFonts(opened);
@@ -224,9 +243,10 @@ class _EditorScreenState extends State<EditorScreen> {
         '${dir.path}/wallpaper_${DateTime.now().millisecondsSinceEpoch}.${result.files.single.extension ?? 'img'}';
     await File(result.files.single.path!).copy(path);
     _mutate(() {
-      doc.layers.removeWhere(
-          (l) => l.kind == LayerKind.image && l.name == 'Wallpaper');
-      doc.layers.insert(
+      final layers = doc.layers
+          .where((l) => !(l.kind == LayerKind.image && l.name == 'Wallpaper'))
+          .toList();
+      layers.insert(
           0,
           StudioLayer(
               id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -237,6 +257,7 @@ class _EditorScreenState extends State<EditorScreen> {
               y: .5,
               width: 1,
               height: 1));
+      doc = doc.copyWith(layers: layers);
       selectedId = doc.layers.first.id;
     });
   }
@@ -260,7 +281,10 @@ class _EditorScreenState extends State<EditorScreen> {
       ..addFont(Future.value(ByteData.sublistView(Uint8List.fromList(bytes))));
     await loader.load();
     _loadedFonts.add(family);
-    if (selected != null) _mutate(() => selected!.fontFamily = family);
+    if (selected != null) {
+      _mutate(() => _updateLayer(selected!.id,
+          (layer) => layer.copyWith(fontFamily: family)));
+    }
   }
 
   Future<void> _loadFonts(StudioDocument document) async {
@@ -426,7 +450,7 @@ class _EditorScreenState extends State<EditorScreen> {
         fontSize: kind == LayerKind.clock ? 260 : 64,
         color: 0xffffffff);
     _mutate(() {
-      doc.layers.add(layer);
+      doc = doc.copyWith(layers: [...doc.layers, layer]);
       selectedId = layer.id;
     });
   }
@@ -594,17 +618,23 @@ class _EditorScreenState extends State<EditorScreen> {
                   onScaleUpdate: (d) {
                     if (l.locked) return;
                     setState(() {
-                      LayerTransform.move(
-                          l, d.focalPointDelta.dx, d.focalPointDelta.dy, w, h);
+                      var updated = doc.layers.firstWhere(
+                          (layer) => layer.id == l.id,
+                          orElse: () => l);
+                      updated = TransformEngine.move(updated,
+                          d.focalPointDelta.dx, d.focalPointDelta.dy, w, h);
                       if (d.pointerCount > 1) {
                         final previous = _pinchScale[l.id] ?? 1;
                         final incremental = d.scale / previous;
-                        LayerTransform.scale(l, incremental, incremental);
+                        updated = TransformEngine.scale(
+                            updated, incremental, incremental);
                         _pinchScale[l.id] = d.scale;
                         final previousRotation = _pinchRotation[l.id] ?? 0;
-                        l.rotation += d.rotation - previousRotation;
+                        updated = TransformEngine.rotate(
+                            updated, d.rotation - previousRotation);
                         _pinchRotation[l.id] = d.rotation;
                       }
+                      _replaceLayer(updated);
                     });
                   },
                   onScaleEnd: (_) {
@@ -741,8 +771,10 @@ class _EditorScreenState extends State<EditorScreen> {
                                   _checkpoint();
                                   setState(() {
                                     if (b > a) b--;
-                                    final it = doc.layers.removeAt(a);
-                                    doc.layers.insert(b, it);
+                                    final layers = [...doc.layers];
+                                    final it = layers.removeAt(a);
+                                    layers.insert(b, it);
+                                    doc = doc.copyWith(layers: layers);
                                   });
                                   refresh(() {});
                                 },
@@ -772,7 +804,10 @@ class _EditorScreenState extends State<EditorScreen> {
                                                 size: 19),
                                             onPressed: () {
                                               _mutate(
-                                                  () => l.visible = !l.visible);
+                                                  () => _updateLayer(l.id,
+                                                      (layer) => layer.copyWith(
+                                                          visible:
+                                                              !layer.visible)));
                                               refresh(() {});
                                             }),
                                         IconButton(
@@ -783,24 +818,27 @@ class _EditorScreenState extends State<EditorScreen> {
                                                 size: 19),
                                             onPressed: () {
                                               _mutate(
-                                                  () => l.locked = !l.locked);
+                                                  () => _updateLayer(l.id,
+                                                      (layer) => layer.copyWith(
+                                                          locked:
+                                                              !layer.locked)));
                                               refresh(() {});
                                             }),
                                         IconButton(
                                             icon: const Icon(Icons.copy,
                                                 size: 19),
                                             onPressed: () {
-                                              final c = l.copy();
                                               _mutate(() {
-                                                c.name = '${l.name} copy';
-                                                doc.layers.insert(
+                                                final layers = [...doc.layers];
+                                                layers.insert(
                                                     i + 1,
-                                                    StudioLayer.fromJson({
-                                                      ...c.toJson(),
-                                                      'id': DateTime.now()
-                                                          .microsecondsSinceEpoch
-                                                          .toString()
-                                                    }));
+                                                    l.copyWith(
+                                                        id: DateTime.now()
+                                                            .microsecondsSinceEpoch
+                                                            .toString(),
+                                                        name: '${l.name} copy'));
+                                                doc = doc.copyWith(
+                                                    layers: layers);
                                               });
                                               refresh(() {});
                                             }),
@@ -810,7 +848,11 @@ class _EditorScreenState extends State<EditorScreen> {
                                                 size: 19),
                                             onPressed: () {
                                               _mutate(() {
-                                                doc.layers.remove(l);
+                                                doc = doc.copyWith(
+                                                    layers: doc.layers
+                                                        .where((layer) =>
+                                                            layer.id != l.id)
+                                                        .toList());
                                                 if (selectedId == l.id) {
                                                   selectedId = null;
                                                 }
@@ -844,32 +886,44 @@ class _EditorScreenState extends State<EditorScreen> {
             if (layer.kind == LayerKind.clock)
               TextButton(
                   onPressed: () =>
-                      _mutate(() => layer.use24Hour = !layer.use24Hour),
+                      _mutate(() => _updateLayer(
+                          layer.id,
+                          (current) => current.copyWith(
+                              use24Hour: !current.use24Hour))),
                   child: Text(layer.use24Hour ? '24 H' : '12 H')),
             if (layer.kind == LayerKind.clock)
               IconButton(
                   onPressed: () =>
-                      _mutate(() => layer.showSeconds = !layer.showSeconds),
+                      _mutate(() => _updateLayer(
+                          layer.id,
+                          (current) => current.copyWith(
+                              showSeconds: !current.showSeconds))),
                   icon: Icon(Icons.more_time,
                       color: layer.showSeconds ? _accent : Colors.white54)),
             if (layer.kind == LayerKind.clock)
               TextButton(
                   onPressed: () =>
-                      _mutate(() => layer.verticalClock = !layer.verticalClock),
+                      _mutate(() => _updateLayer(
+                          layer.id,
+                          (current) => current.copyWith(
+                              verticalClock: !current.verticalClock))),
                   child: Text(layer.verticalClock ? 'VERT' : 'HORIZ')),
             IconButton(
                 onPressed: () => _mutate(() {
-                      final c = layer.copy();
-                      doc.layers.add(StudioLayer.fromJson({
-                        ...c.toJson(),
-                        'id': DateTime.now().microsecondsSinceEpoch.toString(),
-                        'name': '${c.name} copy'
-                      }));
+                      doc = doc.copyWith(layers: [
+                        ...doc.layers,
+                        layer.copyWith(
+                            id: DateTime.now().microsecondsSinceEpoch.toString(),
+                            name: '${layer.name} copy'),
+                      ]);
                     }),
                 icon: const Icon(Icons.copy, size: 18)),
             IconButton(
                 onPressed: () => _mutate(() {
-                      doc.layers.remove(layer);
+                      doc = doc.copyWith(
+                          layers: doc.layers
+                              .where((item) => item.id != layer.id)
+                              .toList());
                       selectedId = null;
                     }),
                 icon: const Icon(Icons.delete_outline, size: 18)),
@@ -885,7 +939,9 @@ class _EditorScreenState extends State<EditorScreen> {
                       value: layer.fontSize.clamp(20, 480),
                       min: 20,
                       max: 480,
-                      onChanged: (v) => setState(() => layer.fontSize = v),
+                      onChanged: (v) => setState(() => _updateLayer(
+                          layer.id,
+                          (current) => current.copyWith(fontSize: v))),
                       onChangeStart: (_) => _checkpoint())),
               Text(layer.fontSize.round().toString(),
                   style: const TextStyle(fontSize: 11))
@@ -919,7 +975,9 @@ class _EditorScreenState extends State<EditorScreen> {
                       value: layer.letterSpacing.clamp(-20, 80),
                       min: -20,
                       max: 80,
-                      onChanged: (v) => setState(() => layer.letterSpacing = v),
+                      onChanged: (v) => setState(() => _updateLayer(
+                          layer.id,
+                          (current) => current.copyWith(letterSpacing: v))),
                       onChangeStart: (_) => _checkpoint()))
             ]),
           ] else if (_activeTool == 'Appearance') ...[
@@ -932,7 +990,9 @@ class _EditorScreenState extends State<EditorScreen> {
                       value: layer.opacity,
                       min: .05,
                       max: 1,
-                      onChanged: (v) => setState(() => layer.opacity = v),
+                      onChanged: (v) => setState(() => _updateLayer(
+                          layer.id,
+                          (current) => current.copyWith(opacity: v))),
                       onChangeStart: (_) => _checkpoint())),
               Text('${(layer.opacity * 100).round()}%',
                   style: const TextStyle(fontSize: 11))
@@ -949,7 +1009,8 @@ class _EditorScreenState extends State<EditorScreen> {
                   0xffff6c9b,
                   0xff171717
                 ].map((c) => InkWell(
-                    onTap: () => _mutate(() => layer.color = c),
+                    onTap: () => _mutate(() => _updateLayer(
+                        layer.id, (current) => current.copyWith(color: c))),
                     child: Container(
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         width: 24,
@@ -975,7 +1036,8 @@ class _EditorScreenState extends State<EditorScreen> {
                       value: layer.width.clamp(.015, 4),
                       min: .015,
                       max: 4,
-                      onChanged: (v) => setState(() => layer.width = v),
+                      onChanged: (v) => setState(() => _updateLayer(
+                          layer.id, (current) => current.copyWith(width: v))),
                       onChangeStart: (_) => _checkpoint()))
             ]),
             Row(children: [
@@ -988,7 +1050,8 @@ class _EditorScreenState extends State<EditorScreen> {
                       value: layer.height.clamp(.015, 4),
                       min: .015,
                       max: 4,
-                      onChanged: (v) => setState(() => layer.height = v),
+                      onChanged: (v) => setState(() => _updateLayer(
+                          layer.id, (current) => current.copyWith(height: v))),
                       onChangeStart: (_) => _checkpoint()))
             ]),
             Row(children: [
@@ -1000,7 +1063,9 @@ class _EditorScreenState extends State<EditorScreen> {
                       value: layer.rotation.clamp(-3.14, 3.14),
                       min: -3.14,
                       max: 3.14,
-                      onChanged: (v) => setState(() => layer.rotation = v),
+                      onChanged: (v) => setState(() => _updateLayer(
+                          layer.id,
+                          (current) => current.copyWith(rotation: v))),
                       onChangeStart: (_) => _checkpoint()))
             ]),
             Row(children: [
@@ -1012,7 +1077,8 @@ class _EditorScreenState extends State<EditorScreen> {
                       value: layer.scaleX.clamp(.05, 12),
                       min: .05,
                       max: 12,
-                      onChanged: (v) => setState(() => layer.scaleX = v),
+                      onChanged: (v) => setState(() => _updateLayer(
+                          layer.id, (current) => current.copyWith(scaleX: v))),
                       onChangeStart: (_) => _checkpoint()))
             ]),
             Row(children: [
@@ -1024,7 +1090,8 @@ class _EditorScreenState extends State<EditorScreen> {
                       value: layer.scaleY.clamp(.05, 12),
                       min: .05,
                       max: 12,
-                      onChanged: (v) => setState(() => layer.scaleY = v),
+                      onChanged: (v) => setState(() => _updateLayer(
+                          layer.id, (current) => current.copyWith(scaleY: v))),
                       onChangeStart: (_) => _checkpoint()))
             ]),
           ],
@@ -1046,7 +1113,9 @@ class _EditorScreenState extends State<EditorScreen> {
                       onPressed: () => Navigator.pop(ctx, controller.text),
                       child: const Text('Done'))
                 ]));
-    if (v != null) _mutate(() => layer.text = v);
+    if (v != null) {
+      _mutate(() => _updateLayer(layer.id, (current) => current.copyWith(text: v)));
+    }
   }
 
   Future<void> _editDateFormat(StudioLayer layer) async {
@@ -1070,12 +1139,13 @@ class _EditorScreenState extends State<EditorScreen> {
                 ]));
     if (v != null) {
       _mutate(() {
-        layer.text = v;
+        var format = v;
         try {
-          DateFormat(v).format(DateTime.now());
+          DateFormat(format).format(DateTime.now());
         } catch (_) {
-          layer.text = 'EEE, d MMM yyyy';
+          format = 'EEE, d MMM yyyy';
         }
+        _updateLayer(layer.id, (current) => current.copyWith(text: format));
       });
     }
   }
@@ -1102,7 +1172,11 @@ class _EditorScreenState extends State<EditorScreen> {
     if (v == null) return;
     try {
       final n = int.parse(v.replaceAll('#', ''), radix: 16);
-      _mutate(() => selected!.color = 0xff000000 | n);
+      final selectedId = this.selected?.id;
+      if (selectedId != null) {
+        _mutate(() => _updateLayer(selectedId,
+            (layer) => layer.copyWith(color: 0xff000000 | n)));
+      }
     } catch (_) {
       _notice('Enter a six digit hex color');
     }
