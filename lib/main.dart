@@ -1168,7 +1168,7 @@ class _EditorScreenState extends State<EditorScreen> {
     if (v == null) return;
     try {
       final n = int.parse(v.replaceAll('#', ''), radix: 16);
-      final selectedId = this.selected?.id;
+      final selectedId = selected?.id;
       if (selectedId != null) {
         _mutate(() => _updateLayer(
             selectedId, (layer) => layer.copyWith(color: 0xff000000 | n)));
